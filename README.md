@@ -617,6 +617,67 @@ The database will be automatically initialized when the card service starts. The
    - Navigate to http://localhost:3000
    - You should see the rewards card aggregator interface
 
+### Testing DR Mode
+
+To test the Disaster Recovery setup:
+
+1. **Start DR services:**
+   ```bash
+   make dev-dr
+   # or
+   docker-compose -f docker-compose.dr.yml up --build
+   ```
+
+2. **Populate DR database** (optional - for testing):
+   ```bash
+   # Connect to DR database
+   psql -h localhost -p 5433 -U postgres -d rewards_db_dr
+   
+   # Create cards table (same schema as primary)
+   CREATE TABLE IF NOT EXISTS cards (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     name VARCHAR(255) NOT NULL,
+     card_number VARCHAR(50),
+     barcode_data VARCHAR(255),
+     balance DECIMAL(10, 2),
+     balance_last_updated TIMESTAMP,
+     created_at TIMESTAMP DEFAULT NOW(),
+     updated_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   # Insert test data
+   INSERT INTO cards (name, card_number, barcode_data, balance) VALUES
+   ('Tesco Clubcard', '1234567890', '1234567890123', 500.00),
+   ('Nectar Card', '0987654321', '0987654321098', 1200.50);
+   ```
+
+3. **Start frontend** (in a separate terminal):
+   ```bash
+   cd frontend && npm run dev
+   ```
+
+4. **Test DR mode:**
+   - Stop primary services: `docker-compose -f docker-compose.dev.yml down`
+   - Frontend will automatically detect DR mode and show:
+     - Yellow "Disaster Recovery Mode Active" banner
+     - "Limited Mode" indicator in header
+     - Read-only card list (no add/edit/delete buttons)
+     - Cached balance indicators
+     - Barcode generation still works
+
+5. **Verify DR restrictions:**
+   - Try to add a card → Should show warning toast
+   - Try to edit a card → Should show warning toast
+   - Try to delete a card → Should show warning toast
+   - Try to refresh balance → Should show warning toast
+   - View cards → Should work (read-only)
+   - View barcodes → Should work
+
+6. **Switch back to primary:**
+   - Start primary services: `make dev`
+   - Frontend will automatically detect primary mode
+   - Full functionality restored
+
 ### Troubleshooting
 
 #### Port Already in Use
@@ -698,7 +759,7 @@ make dev-dr
 # or
 docker-compose -f docker-compose.dr.yml up
 
-# Start frontend
+# Start frontend (will auto-detect primary or DR mode)
 make dev-frontend
 # or
 cd frontend && npm run dev

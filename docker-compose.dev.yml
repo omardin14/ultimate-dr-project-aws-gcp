@@ -100,6 +100,7 @@ services:
       VITE_DR_API_URL: http://localhost:4001
       VITE_BALANCE_API_URL: http://localhost:3003
       VITE_BARCODE_API_URL: http://localhost:3002
+      VITE_DR_BARCODE_API_URL: http://localhost:4002
     depends_on:
       - card-service
       - balance-service

@@ -33,9 +33,16 @@ const CardDetailPage: React.FC = () => {
           loadBarcode(id)
         }
 
-        // Load balance if in primary mode
+        // Don't load balance in DR mode (cached only)
         if (mode === 'primary') {
           loadBalance(id)
+        } else {
+          // In DR mode, show cached balance with warning
+          if (cardData.balance !== undefined) {
+            toast.info('Showing cached balance. Primary service unavailable.', {
+              autoClose: 3000,
+            })
+          }
         }
       } catch (error) {
         console.error('Failed to load card:', error)
@@ -68,7 +75,7 @@ const CardDetailPage: React.FC = () => {
 
     try {
       setIsBalanceLoading(true)
-      const balanceData = await getBalance(cardId)
+      const balanceData = await getBalance(cardId, mode)
       // Update card with latest balance
       if (card) {
         setCard({
@@ -86,11 +93,14 @@ const CardDetailPage: React.FC = () => {
   }
 
   const handleUpdateBalance = async () => {
-    if (!id || mode !== 'primary') return
+    if (!id || mode !== 'primary') {
+      toast.warning('Balance updates are not available in DR mode')
+      return
+    }
 
     try {
       setIsUpdatingBalance(true)
-      const balanceData = await updateBalance(id)
+      const balanceData = await updateBalance(id, mode)
       // Update card with new balance
       if (card) {
         setCard({
@@ -100,9 +110,9 @@ const CardDetailPage: React.FC = () => {
         })
       }
       toast.success('Balance updated successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update balance:', error)
-      toast.error('Failed to update balance')
+      toast.error(error.response?.data?.error?.message || 'Failed to update balance')
     } finally {
       setIsUpdatingBalance(false)
     }
@@ -140,7 +150,7 @@ const CardDetailPage: React.FC = () => {
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <div className="flex justify-between items-center mb-2">
             <span className="text-gray-600 font-medium">Balance</span>
-            {mode === 'primary' && (
+            {mode === 'primary' ? (
               <button
                 onClick={handleUpdateBalance}
                 disabled={isUpdatingBalance}
@@ -148,6 +158,10 @@ const CardDetailPage: React.FC = () => {
               >
                 {isUpdatingBalance ? 'Updating...' : 'Refresh Balance'}
               </button>
+            ) : (
+              <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                Cached Data
+              </span>
             )}
           </div>
           {isBalanceLoading ? (
@@ -169,15 +183,20 @@ const CardDetailPage: React.FC = () => {
                 </p>
               )}
             </>
-          ) : (
-            <div className="text-gray-500">
-              {mode === 'primary' ? (
-                <span>No balance available. Click "Refresh Balance" to fetch.</span>
-              ) : (
-                <span>Balance not available in limited mode.</span>
-              )}
-            </div>
-          )}
+            ) : (
+              <div className="text-gray-500">
+                {mode === 'primary' ? (
+                  <span>No balance available. Click "Refresh Balance" to fetch.</span>
+                ) : (
+                  <div className="space-y-1">
+                    <span className="block">Balance not available in DR mode.</span>
+                    <span className="text-xs text-yellow-600">
+                      Primary service required for balance updates.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
 
         {card.barcodeData && (

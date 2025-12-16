@@ -1,5 +1,4 @@
-version: '3.8'
-
+# DR Stand-In Environment - Read-only services
 services:
   postgres-dr:
     image: postgres:15
@@ -11,27 +10,83 @@ services:
       - "5433:5432"
     volumes:
       - postgres-dr-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   dr-card-service:
     build:
-      context: ./services/dr/card-service
+      context: .
+      dockerfile: ./services/dr/card-service/Dockerfile
     ports:
-      - "4001:3000"
+      - "4001:4001"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres-dr:5432/rewards_db_dr
-      PORT: 3000
+      PORT: 4001
+      DB_HOST: postgres-dr
+      DB_PORT: 5432
+      DB_NAME: rewards_db_dr
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: development
       DR_MODE: "true"
     depends_on:
-      - postgres-dr
+      postgres-dr:
+        condition: service_healthy
+    volumes:
+      - ./services/dr/card-service:/app/services/dr/card-service
+      - ./packages/shared:/app/packages/shared
+      - /app/services/dr/card-service/node_modules
+    command: sh -c "cd /app/services/dr/card-service && npm run dev"
 
   dr-barcode-service:
     build:
-      context: ./services/dr/barcode-service
+      context: .
+      dockerfile: ./services/dr/barcode-service/Dockerfile
     ports:
-      - "4002:3000"
+      - "4002:4002"
     environment:
-      PORT: 3000
+      PORT: 4002
+      DB_HOST: postgres-dr
+      DB_PORT: 5432
+      DB_NAME: rewards_db_dr
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: development
       DR_MODE: "true"
+    depends_on:
+      postgres-dr:
+        condition: service_healthy
+      dr-card-service:
+        condition: service_started
+    volumes:
+      - ./services/dr/barcode-service:/app/services/dr/barcode-service
+      - ./packages/shared:/app/packages/shared
+      - /app/services/dr/barcode-service/node_modules
+    command: sh -c "cd /app/services/dr/barcode-service && npm run dev"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      # Browser makes requests, so use localhost (mapped ports)
+      VITE_API_URL: http://localhost:3001
+      VITE_DR_API_URL: http://localhost:4001
+      VITE_BALANCE_API_URL: http://localhost:3003
+      VITE_BARCODE_API_URL: http://localhost:3002
+      VITE_DR_BARCODE_API_URL: http://localhost:4002
+      # Force DR mode check first (skip primary check)
+      VITE_FORCE_DR_MODE: "true"
+    depends_on:
+      - dr-card-service
+      - dr-barcode-service
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   postgres-dr-data:

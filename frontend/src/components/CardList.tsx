@@ -87,9 +87,16 @@ const CardList: React.FC<CardListProps> = ({
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Balance</span>
-                  <span className="font-semibold text-gray-900">
-                    {card.balance.toLocaleString()} pts
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-gray-900">
+                      {card.balance.toLocaleString()} pts
+                    </span>
+                    {isReadOnly && (
+                      <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
+                        Cached
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
