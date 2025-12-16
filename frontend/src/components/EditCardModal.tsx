@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { toast } from 'react-toastify'
 import { useAppMode } from '../context/AppModeContext'
 import { updateCard, Card, UpdateCardRequest } from '../services/api'

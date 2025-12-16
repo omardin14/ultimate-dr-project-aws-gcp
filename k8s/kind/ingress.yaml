@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rewards-dr-ingress
+  namespace: rewards-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: rewards-dr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      - path: /api/cards
+        pathType: Prefix
+        backend:
+          service:
+            name: dr-card-service
+            port:
+              number: 4001
+      - path: /api/barcode
+        pathType: Prefix
+        backend:
+          service:
+            name: dr-barcode-service
+            port:
+              number: 4002
+

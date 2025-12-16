@@ -46,17 +46,43 @@ minikube addons enable ingress
 # Build Docker images
 echo "🔨 Building Docker images..."
 echo "  - Building card-service..."
-cd services/primary/card-service
-docker build -t card-service:latest .
-cd ../../..
+docker build -t card-service:latest -f services/primary/card-service/Dockerfile .
+
+echo "  - Building balance-service..."
+docker build -t balance-service:latest -f services/primary/balance-service/Dockerfile .
+
+echo "  - Building barcode-service..."
+docker build -t barcode-service:latest -f services/primary/barcode-service/Dockerfile .
 
 echo "  - Building frontend..."
+# Frontend Dockerfile expects to be run from frontend directory
+# Build with environment variables for port forwarding (localhost URLs)
 cd frontend
-docker build -t frontend:latest .
+if [ -f Dockerfile ]; then
+  docker build \
+    --build-arg VITE_API_URL=http://localhost:8001 \
+    --build-arg VITE_DR_API_URL=http://localhost:9001 \
+    --build-arg VITE_BALANCE_API_URL=http://localhost:8003 \
+    --build-arg VITE_BARCODE_API_URL=http://localhost:8002 \
+    --build-arg VITE_DR_BARCODE_API_URL=http://localhost:9002 \
+    -t frontend:latest -f Dockerfile .
+else
+  docker build \
+    --build-arg VITE_API_URL=http://localhost:8001 \
+    --build-arg VITE_DR_API_URL=http://localhost:9001 \
+    --build-arg VITE_BALANCE_API_URL=http://localhost:8003 \
+    --build-arg VITE_BARCODE_API_URL=http://localhost:8002 \
+    --build-arg VITE_DR_BARCODE_API_URL=http://localhost:9002 \
+    -t frontend:latest -f Dockerfile.dev .
+fi
 cd ..
 
 # Apply Kubernetes manifests
 echo "📋 Applying Kubernetes manifests..."
+# Apply namespace first and wait for it
+kubectl apply -f k8s/minikube/namespace.yaml
+sleep 2
+# Apply rest of manifests
 kubectl apply -f k8s/minikube/
 
 # Wait for deployments

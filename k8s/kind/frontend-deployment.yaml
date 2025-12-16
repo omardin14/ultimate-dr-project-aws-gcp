@@ -4,11 +4,12 @@ metadata:
   name: frontend-config
   namespace: rewards-app
 data:
-  VITE_API_URL: "http://localhost:8001"  # Primary K8s (port-forwarded)
-  VITE_DR_API_URL: "http://localhost:9001"  # DR K8s (port-forwarded)
+  VITE_API_URL: "http://localhost:8001"  # Primary K8s (will fail, triggering DR mode)
+  VITE_DR_API_URL: "http://localhost:9001"  # DR Card Service K8s
   VITE_BALANCE_API_URL: "http://localhost:8003"
   VITE_BARCODE_API_URL: "http://localhost:8002"
   VITE_DR_BARCODE_API_URL: "http://localhost:9002"
+  VITE_FORCE_DR_MODE: "true"  # Force DR mode detection
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -28,12 +29,19 @@ spec:
       containers:
       - name: frontend
         image: frontend:latest
-        imagePullPolicy: Never  # Use local image for minikube
+        imagePullPolicy: Never  # Use local image for kind
         ports:
         - containerPort: 80
         envFrom:
         - configMapRef:
             name: frontend-config
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
 ---
 apiVersion: v1
 kind: Service
