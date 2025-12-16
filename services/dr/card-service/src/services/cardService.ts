@@ -3,8 +3,14 @@ import { Card } from '@rewards/shared'
 import { CardModel } from '@rewards/shared'
 
 export const cardService = {
-  getAllCards: async (): Promise<Card[]> => {
-    const result = await db.query('SELECT * FROM cards ORDER BY created_at DESC')
+  getAllCards: async (userId: string = 'default_user'): Promise<Card[]> => {
+    // In DR mode, return only shared cards (read-only)
+    const result = await db.query(
+      `SELECT * FROM cards 
+       WHERE $1 = ANY(shared_with) AND owner_id != $1
+       ORDER BY created_at DESC`,
+      [userId]
+    )
     return result.rows.map((row) => CardModel.toDTO(row))
   },
 

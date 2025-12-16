@@ -37,9 +37,31 @@ export const initDatabase = async () => {
         balance DECIMAL(10, 2),
         balance_last_updated TIMESTAMP,
         image_url TEXT,
+        owner_id VARCHAR(100) DEFAULT 'default_user',
+        shared_with TEXT[], -- Array of user IDs who can view this card
+        permissions JSONB DEFAULT '{"view": true, "edit": false}'::jsonb, -- Permissions for shared users
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
+    `)
+    
+    // Add sharing columns if they don't exist (for existing databases)
+    await db.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='cards' AND column_name='owner_id') THEN
+          ALTER TABLE cards ADD COLUMN owner_id VARCHAR(100) DEFAULT 'default_user';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='cards' AND column_name='shared_with') THEN
+          ALTER TABLE cards ADD COLUMN shared_with TEXT[] DEFAULT ARRAY[]::TEXT[];
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='cards' AND column_name='permissions') THEN
+          ALTER TABLE cards ADD COLUMN permissions JSONB DEFAULT '{"view": true, "edit": false}'::jsonb;
+        END IF;
+      END $$;
     `)
     console.log('Database schema initialized')
   } catch (error) {

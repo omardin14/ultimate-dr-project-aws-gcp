@@ -6,6 +6,7 @@ import { createCardSchema, updateCardSchema } from '@rewards/shared'
 export const cardRoutes = Router()
 
 cardRoutes.get('/', cardController.getAllCards)
+cardRoutes.get('/shared', cardController.getSharedCards)
 cardRoutes.get('/:id', cardController.getCardById)
 cardRoutes.post(
   '/',
@@ -18,4 +19,6 @@ cardRoutes.put(
   cardController.updateCard
 )
 cardRoutes.delete('/:id', cardController.deleteCard)
+cardRoutes.post('/:id/share', cardController.shareCard)
+cardRoutes.post('/:id/unshare', cardController.unshareCard)
 

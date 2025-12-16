@@ -6,6 +6,12 @@ export interface Card {
   balance?: number
   balanceLastUpdated?: Date
   imageUrl?: string
+  ownerId?: string
+  sharedWith?: string[] // Array of user IDs who can view this card
+  permissions?: {
+    view: boolean
+    edit: boolean
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -32,6 +38,19 @@ export interface BarcodeResponse {
 export interface BalanceResponse {
   balance: number
   lastUpdated: Date
+}
+
+export interface ShareCardRequest {
+  userId: string
+  permissions?: {
+    view: boolean
+    edit: boolean
+  }
+}
+
+export interface ShareCardResponse {
+  success: boolean
+  message: string
 }
 
 export interface HealthCheckResponse {

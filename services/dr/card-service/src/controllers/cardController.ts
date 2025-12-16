@@ -5,7 +5,8 @@ import { NotFoundError, ForbiddenError } from '@rewards/shared'
 export const cardController = {
   getAllCards: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const cards = await cardService.getAllCards()
+      const userId = (req.query.userId as string) || 'default_user'
+      const cards = await cardService.getAllCards(userId)
       res.json(cards)
     } catch (error) {
       next(error)
