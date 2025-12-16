@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres-dr:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: rewards_db_dr
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-dr-data:/var/lib/postgresql/data
+
+  dr-card-service:
+    build:
+      context: ./services/dr/card-service
+    ports:
+      - "4001:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres-dr:5432/rewards_db_dr
+      PORT: 3000
+      DR_MODE: "true"
+    depends_on:
+      - postgres-dr
+
+  dr-barcode-service:
+    build:
+      context: ./services/dr/barcode-service
+    ports:
+      - "4002:3000"
+    environment:
+      PORT: 3000
+      DR_MODE: "true"
+
+volumes:
+  postgres-dr-data:
+

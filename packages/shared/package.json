@@ -1,0 +1,20 @@
+{
+  "name": "@rewards/shared",
+  "version": "1.0.0",
+  "description": "Shared types, models, and utilities for rewards card services",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "jest"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.2.2"
+  }
+}
+

@@ -1,0 +1,62 @@
+version: '3.8'
+
+# Local development setup - includes frontend and primary services
+services:
+  # Database
+  postgres-primary:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: rewards_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Primary Card Service
+  card-service:
+    build:
+      context: ./services/primary/card-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DB_HOST: postgres-primary
+      DB_PORT: 5432
+      DB_NAME: rewards_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    volumes:
+      - ./services/primary/card-service:/app
+      - ./packages/shared:/app/packages/shared
+    command: npm run dev
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_DR_API_URL: http://localhost:4001
+    depends_on:
+      - card-service
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres-primary-data:
+

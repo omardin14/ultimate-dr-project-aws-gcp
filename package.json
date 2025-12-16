@@ -1,0 +1,24 @@
+{
+  "name": "ultimate-dr-project",
+  "version": "1.0.0",
+  "description": "Multi-cloud DR rewards card aggregator",
+  "private": true,
+  "workspaces": [
+    "services/**",
+    "packages/**",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build:all": "npm run build --workspaces",
+    "test:all": "npm run test --workspaces",
+    "dev:primary": "npm run dev --workspace=services/primary",
+    "dev:dr": "npm run dev --workspace=services/dr",
+    "dev:frontend": "npm run dev --workspace=frontend"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  }
+}
+
