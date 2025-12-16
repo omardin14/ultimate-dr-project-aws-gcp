@@ -458,28 +458,43 @@ cd frontend
 npm run dev
 ```
 
-### Pre-Production (Minikube)
+### Pre-Production (Dual Kubernetes Clusters)
 
-For testing Kubernetes deployments locally before deploying to AWS/GCP:
+For testing multi-cluster DR deployments locally before deploying to AWS/GCP:
 
-#### Setup Minikube Environment
+#### Architecture
+
+- **Minikube Cluster** = Primary (simulates AWS EKS)
+  - Full-featured services
+  - Card Service, Balance Service, Barcode Service
+  - PostgreSQL database
+
+- **Kind Cluster** = DR (simulates GCP GKE)
+  - Read-only DR services
+  - DR Card Service, DR Barcode Service
+  - Separate PostgreSQL database
+
+#### Setup Both Clusters
 
 ```bash
-# One-time setup (installs minikube, builds images, deploys)
-make minikube-setup
+# Setup both clusters at once
+make k8s-setup-all
 
-# Or manually:
-./scripts/setup-minikube.sh
+# Or setup individually:
+make minikube-setup   # Primary cluster
+make kind-setup       # DR cluster
 ```
 
-This will:
-- Start minikube cluster
-- Build Docker images
-- Deploy to Kubernetes
-- Set up ingress
+#### Check Status
+
+```bash
+# View status of both clusters
+make k8s-status
+```
 
 #### Access Services
 
+**Primary (Minikube):**
 ```bash
 # Get service URLs
 minikube service list -n rewards-app
@@ -487,13 +502,35 @@ minikube service list -n rewards-app
 # Access frontend
 minikube service frontend -n rewards-app
 
-# Or add to /etc/hosts:
-# $(minikube ip) rewards.local
-# Then visit: http://rewards.local
+# Or port-forward
+kubectl port-forward -n rewards-app service/frontend 3000:80
 ```
 
-#### Useful Minikube Commands
+**DR (Kind):**
+```bash
+# Port-forward to access services
+kubectl port-forward -n rewards-app service/frontend 3000:80 --context kind-rewards-dr-cluster
 
+# Or access DR services directly
+kubectl port-forward -n rewards-app service/dr-card-service 4001:4001 --context kind-rewards-dr-cluster
+```
+
+#### Switch Between Clusters
+
+```bash
+# Use primary cluster (minikube)
+kubectl config use-context minikube
+
+# Use DR cluster (kind)
+kubectl config use-context kind-rewards-dr-cluster
+
+# View current context
+kubectl config current-context
+```
+
+#### Useful Commands
+
+**Primary Cluster:**
 ```bash
 # View pods
 kubectl get pods -n rewards-app
@@ -502,12 +539,36 @@ kubectl get pods -n rewards-app
 make minikube-logs
 # Or: kubectl logs -f deployment/card-service -n rewards-app
 
-# Restart deployment
-kubectl rollout restart deployment/card-service -n rewards-app
+# Deploy updates
+make minikube-deploy
 
 # Clean up
 make minikube-clean
-# Or: kubectl delete namespace rewards-app
+```
+
+**DR Cluster:**
+```bash
+# View pods
+kubectl get pods -n rewards-app --context kind-rewards-dr-cluster
+
+# View logs
+make kind-logs
+# Or: kubectl logs -f deployment/dr-card-service -n rewards-app --context kind-rewards-dr-cluster
+
+# Deploy updates
+make kind-deploy
+
+# Clean up
+make kind-clean
+```
+
+#### Data Sync Between Clusters
+
+Since the clusters have separate databases, you'll need to sync data (similar to production cross-cloud replication):
+
+```bash
+# In production, this would be done via a Data Sync Service (Kubernetes CronJob)
+# For local testing, you can manually export/import data between clusters
 ```
 
 **First, login to Docker Hub:**
