@@ -1,9 +1,15 @@
 import axios from 'axios'
 
+// Check if we should force DR mode (useful for DR docker-compose)
+const FORCE_DR_MODE = import.meta.env.VITE_FORCE_DR_MODE === 'true'
+
+// For browser, use localhost. For Docker internal, use service names or host.docker.internal
+// The browser will make requests, so we need localhost URLs
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const DR_API_BASE_URL = import.meta.env.VITE_DR_API_URL || 'http://localhost:4001'
 const BALANCE_API_URL = import.meta.env.VITE_BALANCE_API_URL || 'http://localhost:3003'
 const BARCODE_API_URL = import.meta.env.VITE_BARCODE_API_URL || 'http://localhost:3002'
+const DR_BARCODE_API_URL = import.meta.env.VITE_DR_BARCODE_API_URL || 'http://localhost:4002'
 
 export interface Card {
   id: string
@@ -35,20 +41,40 @@ export type AppMode = 'primary' | 'dr'
 
 // Check which API is available
 export const checkAppMode = async (): Promise<AppMode> => {
-  try {
-    // Try primary API first
-    await axios.get(`${API_BASE_URL}/health`, { timeout: 2000 })
-    return 'primary'
-  } catch {
+  // If forced to DR mode (e.g., in DR docker-compose), check DR first
+  if (FORCE_DR_MODE) {
     try {
-      // Try DR API
-      await axios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
-      return 'dr'
+      const response = await axios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+      if (response.data.mode === 'dr') {
+        return 'dr'
+      }
     } catch {
-      // Default to DR if both fail (safer for read-only)
-      return 'dr'
+      // DR failed, fall through to check primary
     }
   }
+
+  try {
+    // Try primary API first (unless forced to DR)
+    const response = await axios.get(`${API_BASE_URL}/health`, { timeout: 2000 })
+    if (response.data.mode === 'primary' || !response.data.mode) {
+      return 'primary'
+    }
+  } catch {
+    // Primary failed, try DR
+  }
+
+  try {
+    // Try DR API
+    const response = await axios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+    if (response.data.mode === 'dr') {
+      return 'dr'
+    }
+  } catch {
+    // DR also failed
+  }
+
+  // Default to DR if both fail (safer for read-only)
+  return 'dr'
 }
 
 const getApiUrl = (mode: AppMode): string => {
@@ -108,9 +134,10 @@ export const getBarcode = async (
   mode: AppMode
 ): Promise<{ barcode: string; qrCode: string }> => {
   try {
-    // Try barcode service first (if available)
+    // Use appropriate barcode service based on mode
+    const barcodeUrl = mode === 'primary' ? BARCODE_API_URL : DR_BARCODE_API_URL
     const response = await axios.get<{ barcode: string; qrCode: string }>(
-      `${BARCODE_API_URL}/api/barcode/${cardId}`,
+      `${barcodeUrl}/api/barcode/${cardId}`,
       { timeout: 2000 }
     )
     return response.data
@@ -127,20 +154,26 @@ export const getBarcode = async (
   }
 }
 
-// Balance API (primary only)
+// Balance API (primary only - not available in DR mode)
 export interface BalanceResponse {
   balance: number
   lastUpdated: string
 }
 
-export const getBalance = async (cardId: string): Promise<BalanceResponse> => {
+export const getBalance = async (cardId: string, mode: AppMode): Promise<BalanceResponse> => {
+  if (mode === 'dr') {
+    throw new Error('Balance service not available in DR mode')
+  }
   const response = await axios.get<BalanceResponse>(
     `${BALANCE_API_URL}/api/balance/${cardId}`
   )
   return response.data
 }
 
-export const updateBalance = async (cardId: string): Promise<BalanceResponse> => {
+export const updateBalance = async (cardId: string, mode: AppMode): Promise<BalanceResponse> => {
+  if (mode === 'dr') {
+    throw new Error('Balance updates not available in DR mode')
+  }
   const response = await axios.post<BalanceResponse>(
     `${BALANCE_API_URL}/api/balance/${cardId}/update`
   )

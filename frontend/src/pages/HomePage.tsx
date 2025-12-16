@@ -8,7 +8,7 @@ import AddCardModal from '../components/AddCardModal'
 import EditCardModal from '../components/EditCardModal'
 
 const HomePage: React.FC = () => {
-  const { mode } = useAppMode()
+  const { mode, isLoading: modeLoading } = useAppMode()
   const navigate = useNavigate()
   const [cards, setCards] = useState<Card[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -35,8 +35,10 @@ const HomePage: React.FC = () => {
   }
 
   useEffect(() => {
-    loadCards()
-  }, [mode])
+    if (!modeLoading) {
+      loadCards()
+    }
+  }, [mode, modeLoading])
 
   const handleCardClick = (cardId: string) => {
     navigate(`/card/${cardId}`)
