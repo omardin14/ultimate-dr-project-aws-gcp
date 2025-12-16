@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { useAppMode } from '../context/AppModeContext'
-import { getCards, deleteCard, Card } from '../services/api'
+import { getCards, deleteCard, Card, getSharedCards } from '../services/api'
 import CardList from '../components/CardList'
 import AddCardModal from '../components/AddCardModal'
 import EditCardModal from '../components/EditCardModal'
+import ShareCardModal from '../components/ShareCardModal'
+import StatisticsPanel from '../components/StatisticsPanel'
 
 const HomePage: React.FC = () => {
   const { mode, isLoading: modeLoading } = useAppMode()
@@ -14,18 +16,18 @@ const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingCard, setEditingCard] = useState<Card | null>(null)
+  const [sharingCard, setSharingCard] = useState<Card | null>(null)
+  const currentUserId = 'default_user' // In a real app, this would come from auth
 
   const loadCards = async () => {
     try {
       setIsLoading(true)
-      const data = await getCards(mode)
+      // In DR mode, getSharedCards returns shared cards (read-only)
+      // In Full mode, getCards returns all cards (owned + shared)
+      const data = mode === 'dr' 
+        ? await getSharedCards(mode, currentUserId)
+        : await getCards(mode)
       setCards(data)
-
-      // Load balances for all cards if in primary mode
-      if (mode === 'primary') {
-        // Balances are already included in card data from the database
-        // But we can refresh them if needed
-      }
     } catch (error) {
       console.error('Failed to load cards:', error)
       toast.error('Failed to load cards')
@@ -90,6 +92,19 @@ const HomePage: React.FC = () => {
     setEditingCard(null)
     loadCards()
     toast.success('Card updated successfully')
+  }
+
+  const handleShareCard = (card: Card) => {
+    if (mode === 'dr') {
+      toast.warning('Cannot modify sharing in DR mode')
+      return
+    }
+    setSharingCard(card)
+  }
+
+  const handleSharingSuccess = () => {
+    setSharingCard(null)
+    loadCards()
   }
 
   if (isLoading) {
@@ -159,7 +174,9 @@ const HomePage: React.FC = () => {
           onCardClick={handleCardClick}
           onEditCard={handleEditCard}
           onDeleteCard={handleDeleteCard}
+          onShareCard={handleShareCard}
           isReadOnly={mode === 'dr'}
+          currentUserId={currentUserId}
         />
       )}
 
@@ -177,6 +194,20 @@ const HomePage: React.FC = () => {
           onSuccess={handleCardUpdated}
         />
       )}
+
+      {sharingCard && (
+        <ShareCardModal
+          card={sharingCard}
+          isOpen={!!sharingCard}
+          onClose={() => setSharingCard(null)}
+          onSuccess={handleSharingSuccess}
+        />
+      )}
+
+      {/* Statistics Panel at the bottom */}
+      <div className="mt-12">
+        <StatisticsPanel />
+      </div>
     </div>
   )
 }

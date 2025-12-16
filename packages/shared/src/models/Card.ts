@@ -12,6 +12,13 @@ export class CardModel {
         ? new Date(card.balance_last_updated)
         : undefined,
       imageUrl: card.image_url || undefined,
+      ownerId: card.owner_id || undefined,
+      sharedWith: card.shared_with || undefined,
+      permissions: card.permissions
+        ? typeof card.permissions === 'string'
+          ? JSON.parse(card.permissions)
+          : card.permissions
+        : undefined,
       createdAt: new Date(card.created_at),
       updatedAt: new Date(card.updated_at),
     }

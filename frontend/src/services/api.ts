@@ -1,7 +1,52 @@
-import axios from 'axios'
+import axios, { AxiosInstance } from 'axios'
 
 // Check if we should force DR mode (useful for DR docker-compose)
 const FORCE_DR_MODE = import.meta.env.VITE_FORCE_DR_MODE === 'true'
+
+// Response time tracking callback
+let responseTimeCallback: ((time: number) => void) | null = null
+
+export const setResponseTimeCallback = (callback: (time: number) => void) => {
+  responseTimeCallback = callback
+}
+
+// Create axios instances with response time tracking
+const createAxiosInstance = (baseURL: string): AxiosInstance => {
+  const instance = axios.create({ baseURL })
+
+  // Request interceptor - record start time
+  instance.interceptors.request.use((config) => {
+    ;(config as any).startTime = Date.now()
+    return config
+  })
+
+  // Response interceptor - calculate and record response time
+  instance.interceptors.response.use(
+    (response) => {
+      const endTime = Date.now()
+      const startTime = (response.config as any).startTime
+      if (startTime && responseTimeCallback) {
+        const responseTime = endTime - startTime
+        responseTimeCallback(responseTime)
+      }
+      return response
+    },
+    (error) => {
+      const endTime = Date.now()
+      const startTime = (error.config as any)?.startTime
+      if (startTime && responseTimeCallback) {
+        const responseTime = endTime - startTime
+        responseTimeCallback(responseTime)
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  return instance
+}
+
+// Create tracked axios instances
+const trackedAxios = createAxiosInstance('')
 
 // For browser, use localhost. For Docker internal, use service names or host.docker.internal
 // The browser will make requests, so we need localhost URLs
@@ -19,6 +64,12 @@ export interface Card {
   balance?: number
   balanceLastUpdated?: string
   imageUrl?: string
+  ownerId?: string
+  sharedWith?: string[]
+  permissions?: {
+    view: boolean
+    edit: boolean
+  }
   createdAt: string
   updatedAt: string
 }
@@ -44,7 +95,11 @@ export const checkAppMode = async (): Promise<AppMode> => {
   // If forced to DR mode (e.g., in DR docker-compose), check DR first
   if (FORCE_DR_MODE) {
     try {
-      const response = await axios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+      const startTime = Date.now()
+      const response = await trackedAxios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+      if (responseTimeCallback) {
+        responseTimeCallback(Date.now() - startTime)
+      }
       if (response.data.mode === 'dr') {
         return 'dr'
       }
@@ -55,7 +110,11 @@ export const checkAppMode = async (): Promise<AppMode> => {
 
   try {
     // Try primary API first (unless forced to DR)
-    const response = await axios.get(`${API_BASE_URL}/health`, { timeout: 2000 })
+    const startTime = Date.now()
+    const response = await trackedAxios.get(`${API_BASE_URL}/health`, { timeout: 2000 })
+    if (responseTimeCallback) {
+      responseTimeCallback(Date.now() - startTime)
+    }
     if (response.data.mode === 'primary' || !response.data.mode) {
       return 'primary'
     }
@@ -65,7 +124,11 @@ export const checkAppMode = async (): Promise<AppMode> => {
 
   try {
     // Try DR API
-    const response = await axios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+    const startTime = Date.now()
+    const response = await trackedAxios.get(`${DR_API_BASE_URL}/health`, { timeout: 2000 })
+    if (responseTimeCallback) {
+      responseTimeCallback(Date.now() - startTime)
+    }
     if (response.data.mode === 'dr') {
       return 'dr'
     }
@@ -83,12 +146,12 @@ const getApiUrl = (mode: AppMode): string => {
 
 // Card API
 export const getCards = async (mode: AppMode): Promise<Card[]> => {
-  const response = await axios.get<Card[]>(`${getApiUrl(mode)}/api/cards`)
+  const response = await trackedAxios.get<Card[]>(`${getApiUrl(mode)}/api/cards`)
   return response.data
 }
 
 export const getCard = async (id: string, mode: AppMode): Promise<Card> => {
-  const response = await axios.get<Card>(`${getApiUrl(mode)}/api/cards/${id}`)
+  const response = await trackedAxios.get<Card>(`${getApiUrl(mode)}/api/cards/${id}`)
   return response.data
 }
 
@@ -99,7 +162,7 @@ export const createCard = async (
   if (mode === 'dr') {
     throw new Error('Cannot create cards in DR mode')
   }
-  const response = await axios.post<Card>(
+  const response = await trackedAxios.post<Card>(
     `${getApiUrl(mode)}/api/cards`,
     card
   )
@@ -114,7 +177,7 @@ export const updateCard = async (
   if (mode === 'dr') {
     throw new Error('Cannot update cards in DR mode')
   }
-  const response = await axios.put<Card>(
+  const response = await trackedAxios.put<Card>(
     `${getApiUrl(mode)}/api/cards/${id}`,
     card
   )
@@ -125,7 +188,71 @@ export const deleteCard = async (id: string, mode: AppMode): Promise<void> => {
   if (mode === 'dr') {
     throw new Error('Cannot delete cards in DR mode')
   }
-  await axios.delete(`${getApiUrl(mode)}/api/cards/${id}`)
+  await trackedAxios.delete(`${getApiUrl(mode)}/api/cards/${id}`)
+}
+
+// Sharing API (Full mode only)
+export const getSharedCards = async (mode: AppMode, userId: string = 'default_user'): Promise<Card[]> => {
+  if (mode === 'dr') {
+    // In DR mode, return shared cards (read-only)
+    const allCards = await getCards(mode)
+    return allCards.filter(card => card.sharedWith && card.sharedWith.includes(userId) && card.ownerId !== userId)
+  }
+  const response = await trackedAxios.get<Card[]>(`${getApiUrl(mode)}/api/cards/shared?userId=${userId}`)
+  return response.data
+}
+
+export const shareCard = async (
+  cardId: string,
+  shareRequest: ShareCardRequest,
+  mode: AppMode
+): Promise<ShareCardResponse> => {
+  if (mode === 'dr') {
+    throw new Error('Cannot share cards in DR mode')
+  }
+  const response = await trackedAxios.post<ShareCardResponse>(
+    `${getApiUrl(mode)}/api/cards/${cardId}/share`,
+    shareRequest
+  )
+  return response.data
+}
+
+export const unshareCard = async (
+  cardId: string,
+  userId: string,
+  mode: AppMode
+): Promise<ShareCardResponse> => {
+  if (mode === 'dr') {
+    throw new Error('Cannot unshare cards in DR mode')
+  }
+  const response = await trackedAxios.post<ShareCardResponse>(
+    `${getApiUrl(mode)}/api/cards/${cardId}/unshare`,
+    { userId }
+  )
+  return response.data
+}
+
+// Statistics API
+export interface Statistics {
+  totalBalance: number
+  averageBalance: number
+  cardCount: number
+  cardsWithBalance: number
+  lastUpdated: string
+  isStale?: boolean
+  staleWarning?: string
+  trends?: {
+    balanceHistory?: Array<{ date: string; balance: number }>
+    cardCountHistory?: Array<{ date: string; count: number }>
+  }
+}
+
+export const getStatistics = async (mode: AppMode, userId: string = 'default_user'): Promise<Statistics> => {
+  const includeTrends = mode === 'primary' // Only include trends in Full mode
+  const response = await trackedAxios.get<Statistics>(
+    `${getApiUrl(mode)}/api/statistics?userId=${userId}&trends=${includeTrends}`
+  )
+  return response.data
 }
 
 // Barcode API
@@ -136,7 +263,7 @@ export const getBarcode = async (
   try {
     // Use appropriate barcode service based on mode
     const barcodeUrl = mode === 'primary' ? BARCODE_API_URL : DR_BARCODE_API_URL
-    const response = await axios.get<{ barcode: string; qrCode: string }>(
+    const response = await trackedAxios.get<{ barcode: string; qrCode: string }>(
       `${barcodeUrl}/api/barcode/${cardId}`,
       { timeout: 2000 }
     )
@@ -160,11 +287,25 @@ export interface BalanceResponse {
   lastUpdated: string
 }
 
+export interface ShareCardRequest {
+  userId: string
+  permissions?: {
+    view: boolean
+    edit: boolean
+  }
+}
+
+export interface ShareCardResponse {
+  success: boolean
+  message: string
+  card?: Card
+}
+
 export const getBalance = async (cardId: string, mode: AppMode): Promise<BalanceResponse> => {
   if (mode === 'dr') {
     throw new Error('Balance service not available in DR mode')
   }
-  const response = await axios.get<BalanceResponse>(
+  const response = await trackedAxios.get<BalanceResponse>(
     `${BALANCE_API_URL}/api/balance/${cardId}`
   )
   return response.data
@@ -174,7 +315,7 @@ export const updateBalance = async (cardId: string, mode: AppMode): Promise<Bala
   if (mode === 'dr') {
     throw new Error('Balance updates not available in DR mode')
   }
-  const response = await axios.post<BalanceResponse>(
+  const response = await trackedAxios.post<BalanceResponse>(
     `${BALANCE_API_URL}/api/balance/${cardId}/update`
   )
   return response.data

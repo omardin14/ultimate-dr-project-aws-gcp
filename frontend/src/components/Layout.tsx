@@ -1,5 +1,6 @@
 import React from 'react'
 import { useAppMode } from '../context/AppModeContext'
+import PerformanceIndicator from './PerformanceIndicator'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -19,17 +20,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Rewards Card Aggregator
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {!isLoading && (
-                <div
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    mode === 'primary'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}
-                >
-                  {mode === 'primary' ? '✓ Full Mode' : '⚠ Limited Mode'}
-                </div>
+                <>
+                  <div
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      mode === 'primary'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {mode === 'primary' ? '✓ Full Mode' : '⚠ Limited Mode'}
+                  </div>
+                  <PerformanceIndicator />
+                </>
               )}
             </div>
           </div>
@@ -77,6 +81,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Footer with Branding */}
+      <footer className="bg-white border-t border-gray-200 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex justify-between items-center">
+            <div className="text-xs text-gray-500">
+              © {new Date().getFullYear()} Rewards Card Aggregator
+            </div>
+            <div className="flex items-center space-x-1.5">
+              {mode === 'primary' ? (
+                <div className="flex items-center space-x-2 text-xs text-gray-600">
+                  <span className="text-gray-500">Powered by</span>
+                  <span className="font-bold text-orange-600">AWS</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 text-xs text-gray-600">
+                  <span className="text-gray-500">Powered by</span>
+                  <span className="font-bold text-blue-600">GCP</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { cardRoutes } from './routes/cardRoutes'
 import { healthRoutes } from './routes/healthRoutes'
+import { statisticsRoutes } from './routes/statisticsRoutes'
 import { errorHandler } from './middleware/errorHandler'
 
 dotenv.config()
@@ -17,6 +18,7 @@ app.use(express.json())
 // Routes
 app.use('/health', healthRoutes)
 app.use('/api/cards', cardRoutes)
+app.use('/api/statistics', statisticsRoutes)
 
 // Error handling
 app.use(errorHandler)
