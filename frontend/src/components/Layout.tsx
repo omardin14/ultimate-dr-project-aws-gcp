@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAppMode } from '../context/AppModeContext'
 import PerformanceIndicator from './PerformanceIndicator'
+import DRCapabilitiesModal from './DRCapabilitiesModal'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -8,6 +9,18 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { mode, isLoading } = useAppMode()
+  const [showDRModal, setShowDRModal] = useState(false)
+  const [previousMode, setPreviousMode] = useState<typeof mode>('primary')
+
+  // Show modal when switching to DR mode
+  useEffect(() => {
+    if (!isLoading && mode === 'dr' && previousMode !== 'dr') {
+      // Clear the dismissed flag when entering DR mode (optional - remove if you want it to persist)
+      // localStorage.removeItem('dr-capabilities-dismissed')
+      setShowDRModal(true)
+    }
+    setPreviousMode(mode)
+  }, [mode, isLoading, previousMode])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,16 +79,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => window.location.reload()}
-                className="text-xs text-yellow-800 hover:text-yellow-900 underline"
-              >
-                Retry Primary
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setShowDRModal(true)}
+                  className="text-xs text-yellow-800 hover:text-yellow-900 underline"
+                >
+                  What can I do?
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-xs text-yellow-800 hover:text-yellow-900 underline"
+                >
+                  Retry Primary
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* DR Capabilities Modal */}
+      <DRCapabilitiesModal
+        isOpen={showDRModal}
+        onClose={() => setShowDRModal(false)}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
